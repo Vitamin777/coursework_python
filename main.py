@@ -3,19 +3,18 @@
 Программа производит резервное копирование фотографий из профиля Вконтакте с наилучшим качеством на Яндекс диск
 
 Входные данные:
-user_ids_vk.txt     - Id Vk
-token_vk.txt        - токен Vk
-token_yandex.txt    - token Yandex
+user_id_token.txt   - токен Vk, token Yandex, Id Vk
 amount_photo = 5    - количество фотографий для резервного копирования
 folder_name_ya      - имя создаваемой папки на Яндекс диске
 
 Выходные данные:
-data.txt            - файл для вывода списка файлов в формате json
+data.json            - файл для вывода списка файлов в формате json
 Папка на Яндекс диске с сохраненными фотографиями
 '''
 
 import requests
 import json
+from tqdm import tqdm
 
 
 class VkUser:
@@ -131,38 +130,31 @@ class YaUploader:
         response = requests.put(f'{upload_url}?path={folder_name}', headers=headers, params=params)
         if response.status_code == 201:
             # Логирование процесса записи на яндекс диск
-            print(f'Папка {folder_name} успешно создана на яндекс диске')
+            print(f'Папка {folder_name} успешно создана на Яндекс диске')
 
     def upload(self, list_files, folder_ya):
         """Метод загружает файлы по списку list_files на яндекс диск"""
-        for file in list_files:
+        # создаем папку на яндекс диске
+        self.create_folder_ya(folder_name=folder_ya)
+        print(f'Cохраняем файлы {len(list_files)} шт. в папку {folder_ya} на Яндекс диск')
+        for file in tqdm(list_files,colour='green'):
             file_name = file['file_name']
-
-            # создаем папку на яндекс диске
-            self.create_folder_ya(folder_name=folder_ya)
-
             disk_file_path = folder_ya + '/' + file_name  # Если папка существует на яндекс диске
             response_href = self._get_upload_link(disk_file_path=disk_file_path)
             href = response_href.get('href', '')
             data = requests.get(file['url'])
             response = requests.put(href, data=data.content)
-            response.raise_for_status()
-            if response.status_code == 201:
-                # Логирование процесса записи на яндекс диск
-                print(f'Файл {file_name} успешно записан в папку {folder_ya} на Яндекс диск')
+        print('Файлы успешно сохранены на Яндекс диск')
 
 if __name__ == '__main__':
-    # Получаем токен Vk
-    with open('token_vk.txt', 'r') as file_object:
-        token_vk = file_object.read().strip()
-    # Получаем user id Vk
-    with open('user_ids_vk.txt', 'r') as file_object:
-        user_ids = file_object.read().strip()
-    # Получаем токен на Яндекс диске
-    with open('token_yandex.txt', 'r') as f:
-        token_ya = f.readline()
-    # Задаем количество сохраняемых фотографий
-    amount_photo = 5
+    # Получаем токен Vk, токен на Яндекс диске, user id Vk
+    with open('user_id_token.txt', 'r') as file_object:
+        token_vk = file_object.readline().strip()
+        token_ya = file_object.readline().strip()
+        user_ids = file_object.readline().strip()
+
+    # Запрашиваем количество сохраняемых фотографий
+    amount_photo = int(input('Введите количество сохраняемых фотографий на Яндекс диск: '))
     # Задаем имя папки  на Яндекс диске
     folder_name_ya = 'my_photo_vk'
     # Задаем версию Vk
@@ -174,10 +166,10 @@ if __name__ == '__main__':
     list_photo = vk_client.data_filtering()
     # Формируем списки
     output_list_files, list_files = get_list_files(list_photo)
-    # Выводим требуемый список output_list_files в json файл  data.txt
-    with open('data.txt', 'w', encoding='utf-8') as file_obj:
-       json.dump(output_list_files, file_obj, ensure_ascii=False)
-       print('Список файлов с указанием размера сохранен в формате json в файл data.txt')
+    # Выводим требуемый список output_list_files в json файл  data.json
+    with open('data.json', 'w', encoding='utf-8') as file_obj:
+       json.dump(output_list_files, file_obj, indent=4, ensure_ascii=False)
+       print('Список файлов с указанием размера сохранен в формате json в файл data.json')
 
     # Создаем экземпляр класса YaUploader()
     uploader = YaUploader(token_ya)
